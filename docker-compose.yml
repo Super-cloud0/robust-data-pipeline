@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pipe
+      POSTGRES_PASSWORD: pipe
+      POSTGRES_DB: pipe
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pipe"]
+      interval: 5s
+      retries: 10
+
+  scraper:
+    build: .
+    env_file: .env
+    environment:
+      PIPE_DATABASE_URL: postgresql://pipe:pipe@db:5432/pipe
+    volumes:
+      - ./output:/app/output
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    # каждые 6 часов: CSV для клиента + upsert в Postgres
+    command: ["schedule", "books_demo", "--cron", "0 */6 * * *", "--out", "csv", "postgres"]
+
+volumes:
+  pgdata:
